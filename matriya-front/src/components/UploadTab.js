@@ -577,7 +577,7 @@ function UploadTab({ onGptSyncingChange, gptRagSyncing = false }) {
                     </div>
 
                     <div className="card upload-ask-card">
-                        <h2>שאל על המסמכים</h2>
+                        <h2>שאילת מסמכים</h2>
                         <GptSyncStatusRow
                             ref={gptSyncRowRef}
                             filenames={fileList.map((f) => f.filename)}
@@ -607,10 +607,7 @@ function UploadTab({ onGptSyncingChange, gptRagSyncing = false }) {
                                         ))}
                                     </select>
                                     <p id="upload-ask-scope-hint" className="upload-ask-hint muted">
-                                        השרת בודק תחילה אם השאלה באופן ברור עוסקת ברשימת החומרים/הניסויים כפי שרשומים במערכת הניהול (כשיש חיבור לשרת הניהול); שאלות מקט, מפרט טכני או תוכן מסמכים — בדרך כלל נענות מטקסט הקבצים בטבלה. אם כן לניהול — התשובה מסתמכת על הנתונים משם; אחרת על טקסט המסמכים. ציטוטים מהמסמכים — רק לקבצים המופיעים ברשימה; אחרי מחיקה יש לרענן; סנכרון OpenAI למעלה מעדכן את החיפוש בענן.
-                                    </p>
-                                    <p className="upload-ask-hint muted">
-                                        לאותה שאלה ואותה בחירת קבצים (טווח החיפוש למעלה), המערכת מכוונת לתשובה יציבה ועקבית יותר.
+                                        תשובה לפי טקסט מאונדקס של הקבצים (או נתוני ניהול כשהם רלוונטיים). לא ממשק החלטה — לכך השתמשו בלשונית &quot;החלטה / מחקר&quot; → מעבדה.
                                     </p>
                                 </div>
                                 <label htmlFor="upload-ask-query">שאל שאלה</label>
@@ -622,9 +619,6 @@ function UploadTab({ onGptSyncingChange, gptRagSyncing = false }) {
                                     rows={4}
                                     disabled={askLoading || isUploading || gptRagSyncing}
                                 />
-                                <p className="upload-ask-live-status" aria-live="polite">
-                                    {`התקבלו ${askQuery.length} תווים LIVE typing detected — UI updates on every keystroke ✅`}
-                                </p>
                                 <button
                                     type="button"
                                     className="upload-ask-run"

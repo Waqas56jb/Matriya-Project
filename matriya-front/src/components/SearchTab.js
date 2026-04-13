@@ -146,10 +146,8 @@ function SearchTab({ onGptSyncingChange, gptRagSyncing = false }) {
                         { timeout: 120000 }
                     );
                     const queryResult = response.data;
-                    // David Step 1 — verify API in DevTools → Console
-                    console.log('[Lab] queryResult', queryResult);
-                    if (typeof window !== 'undefined') {
-                        window.__MATRIYA_LAB_QUERY_RESULT = queryResult;
+                    if (process.env.NODE_ENV === 'development') {
+                        console.log('[Lab] queryResult', queryResult);
                     }
                     setLastResultsFromLab(true);
                     setResults(queryResult);
@@ -222,16 +220,13 @@ function SearchTab({ onGptSyncingChange, gptRagSyncing = false }) {
             const data = err.response?.data;
             const msg = data?.error || data?.detail || err.message;
             if (searchFlowMode === 'lab' && data && typeof data === 'object') {
-                console.log('[Lab] queryResult (error response body)', data);
-                if (typeof window !== 'undefined') {
-                    window.__MATRIYA_LAB_QUERY_RESULT = data;
+                if (process.env.NODE_ENV === 'development') {
+                    console.log('[Lab] queryResult (error response body)', data);
                 }
                 setLastResultsFromLab(true);
                 setResults(data);
                 if (!isAnswerComposerPayload(data)) {
-                    setError(
-                        'Lab returned JSON that is NOT Answer Composer shape. Point REACT_APP_API_BASE_URL to your local matriya-back (e.g. http://localhost:8000) with the latest code, then restart npm start.'
-                    );
+                    setError('השרת החזיר תגובה שאינה פורמט החלטה. בדקו את כתובת ה־API (REACT_APP_API_BASE_URL).');
                 } else {
                     setError(null);
                 }
@@ -271,13 +266,6 @@ function SearchTab({ onGptSyncingChange, gptRagSyncing = false }) {
     useEffect(() => {
         loadDocumentFiles();
     }, [loadDocumentFiles]);
-
-    // David Step 2 — confirm React state after setResults (same object as console above)
-    useEffect(() => {
-        if (results && lastResultsFromLab) {
-            console.log('[Lab] queryResult (React state)', results);
-        }
-    }, [results, lastResultsFromLab]);
 
     const handleAgentCheck = async (agentType) => {
         if (isAnswerComposerPayload(results)) {
@@ -345,14 +333,10 @@ function SearchTab({ onGptSyncingChange, gptRagSyncing = false }) {
     return (
         <div className="search-tab">
                 <div className="card">
-                <h2>{searchFlowMode === 'lab' ? 'Lab — Answer Composer' : 'חיפוש במסמכים'}</h2>
+                <h2>{searchFlowMode === 'lab' ? 'מערכת החלטה (מעבדה)' : 'חיפוש במסמכים'}</h2>
                 {searchFlowMode === 'lab' && (
-                    <p className="lab-composer-banner" lang="en">
-                        After <strong>Search</strong>, open Console (F12): you should see{' '}
-                        <code>[Lab] queryResult</code> with <code>decision_status</code>,{' '}
-                        <code>evidence.run_ids</code>, <code>evidence.delta_summary</code>,{' '}
-                        <code>external_context</code>. Also: <code>window.__MATRIYA_LAB_QUERY_RESULT</code>. Raw JSON
-                        is under &quot;Debug: raw queryResult JSON&quot; below the dashboard.
+                    <p className="decision-first-lead">
+                        תצוגת החלטה בלבד: סטטוס, ראיות, צעד הבא והקשר חיצוני (אופציונלי). לא ממשק צ&apos;אט.
                     </p>
                 )}
                 <GptSyncStatusRow
@@ -420,7 +404,7 @@ function SearchTab({ onGptSyncingChange, gptRagSyncing = false }) {
                             {searchFlowMode === 'document'
                                 ? 'Retrieval + תשובה בלבד. לא רצים validateAndAdvance, pre-LLM FSM או state machine.'
                                 : searchFlowMode === 'lab'
-                                  ? 'POST flow=lab לשרת Matriya — גוף התשובה הוא מפתחי composeAnswer בלבד (ללא שינוי בשכבת ה-UI).'
+                                  ? 'שאילתת מעבדה — תשובה במבנה החלטה בלבד.'
                                   : 'מסלול מחקר מלא: סשן, שלב K→L, שער ראיות לפני LLM, וקרנל.'}
                         </p>
                     </div>
@@ -632,15 +616,8 @@ function SearchTab({ onGptSyncingChange, gptRagSyncing = false }) {
                 )}
 
                 {isSearching && (
-                    <div className="loading">
-                        <div>מחפש במסמכים...</div>
-                        <div style={{ marginTop: '15px', fontSize: '0.95em', color: '#a0a0c0' }}>
-                            {answerMode === 'agents'
-                                ? '🤖 מריץ 4 סוכנים (ניתוח → מחקר → ביקורת → סינתזה)...'
-                                : searchFlowMode === 'lab'
-                                  ? '🔗 Lab chain — calling /api/research/search (flow=lab)...'
-                                  : '🤖 מייצר תשובה חכמה באמצעות AI...'}
-                        </div>
+                    <div className="loading loading--compact" aria-busy="true">
+                        {searchFlowMode === 'lab' ? 'מריץ שאילתת החלטה…' : 'מעבד…'}
                     </div>
                 )}
 
@@ -650,22 +627,11 @@ function SearchTab({ onGptSyncingChange, gptRagSyncing = false }) {
                         {composerPayload && <AnswerView data={results} />}
                         {labMismatch && (
                             <div className="lab-composer-mismatch" role="alert">
-                                <h3 lang="en">Answer Composer not detected</h3>
-                                <p lang="en">
-                                    The API response is missing the six Composer fields. Your UI is new, but the
-                                    backend URL is probably an old server (e.g. Vercel). Set{' '}
-                                    <code>REACT_APP_API_BASE_URL=http://localhost:8000</code> in <code>.env</code> and
-                                    restart <code>npm start</code>. Run <code>matriya-back</code> locally with the
-                                    latest code.
+                                <h3>תגובת השרת אינה בפורמט החלטה</h3>
+                                <p className="lab-composer-mismatch-short">
+                                    ודאו ש־<code>REACT_APP_API_BASE_URL</code> מצביע על שרת Matriya מעודכן.
                                 </p>
-                                <pre className="lab-composer-mismatch-pre">{JSON.stringify(results, null, 2)}</pre>
                             </div>
-                        )}
-                        {lastResultsFromLab && results && (
-                            <details className="lab-debug-json" open={false}>
-                                <summary lang="en">Step 4 — Debug: raw queryResult JSON (David)</summary>
-                                <pre className="lab-debug-json-pre">{JSON.stringify(results, null, 2)}</pre>
-                            </details>
                         )}
                         {legacyResults && (
                         <>

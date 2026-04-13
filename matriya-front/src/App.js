@@ -13,7 +13,7 @@ const TAB_SWITCH_BLOCKED_WHILE_GPT_SYNC_TITLE =
     'לא ניתן לעבור לשונית אחרת בזמן סנכרון המסמכים (מסנכרן…)';
 
 function App() {
-    const [activeTab, setActiveTab] = useState('upload');
+    const [activeTab, setActiveTab] = useState('search');
     const [user, setUser] = useState(null);
     const [isLoading, setIsLoading] = useState(true);
     const [gptRagSyncing, setGptRagSyncing] = useState(false);
@@ -83,16 +83,16 @@ function App() {
     // Ensure non-admins never stay on Admin tab (e.g. after auth state update)
     React.useEffect(() => {
         if (user && !isAdmin && activeTab === 'admin') {
-            setActiveTab('upload');
+            setActiveTab('search');
         } else if (activeTab === 'lab') {
-            setActiveTab('upload');
+            setActiveTab('search');
         }
     }, [user, isAdmin, activeTab]);
 
     const tabs = [
+        { id: 'search', label: 'החלטה / מחקר' },
         { id: 'upload', label: 'העלאת מסמכים' },
-        { id: 'ask', label: 'Ask Matriya' },
-        { id: 'search', label: 'מחקר' },
+        { id: 'ask', label: 'מסמכים (שאילתה)' },
         ...(isAdmin ? [{ id: 'admin', label: 'ניהול' }] : [])
     ];
 
