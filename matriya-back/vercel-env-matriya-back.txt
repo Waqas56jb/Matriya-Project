@@ -22,3 +22,7 @@ API_HOST=0.0.0.0
 API_PORT=8000
 DB_MODE=default
 CHROMA_DB_PATH=./chroma_db
+
+# Lab bridge (flow=lab): matriya-back → GET maneger-back /api/lab/query — REQUIRED for lab queries on Vercel.
+# Must be an absolute URL with scheme (https://...). Same host as your deployed maneger-back project.
+MANAGEMENT_BACK_URL=https://matriya-project-vskr.vercel.app

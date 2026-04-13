@@ -26,6 +26,9 @@ HF_MODEL=microsoft/phi-2
 # Optional: OpenAI for better embeddings (recommended)
 OPENAI_API_KEY=your-openai-api-key
 
+# Lab bridge (flow=lab): matriya-back → maneger-back GET /api/lab/query. Use full URL with https:// (no trailing slash).
+# MANAGEMENT_BACK_URL=https://your-maneger-back.vercel.app
+#
 # Optional: Management API (maneger-back) base URL — no trailing slash. When set, «שאל על המסמכים» can answer
 # from /api/materials + /api/projects after an LLM gate (same Bearer token as Matriya if auth is shared).
 # MATRIYA_MANAGEMENT_API_URL=http://localhost:4000

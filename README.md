@@ -84,6 +84,40 @@ Run `npm test` (or the specific `npm run` scripts) inside `matriya-back` or `man
 - Prefer **`.env.example`** / `env_example.txt` patterns for onboarding; rotate any credential that was ever committed by mistake.
 - Deployment notes for Vercel and related envs live next to each app (for example `VERCEL_DEPLOY.md`, `vercel.json`).
 
+### Vercel: wiring the Matriya API URL
+
+When **Matriya backend** is live (example: [https://matriya-project-fttv.vercel.app](https://matriya-project-fttv.vercel.app)), set these **per project** in the Vercel dashboard (**Project → Settings → Environment Variables**). Use **Production** (and Preview if you use preview deployments).
+
+| Vercel project | Variable | Value (example) |
+|----------------|----------|-------------------|
+| **matriya-front** | `REACT_APP_API_BASE_URL` | `https://matriya-project-fttv.vercel.app` |
+| **maneger-back** | `MATRIYA_BACK_URL` | `https://matriya-project-fttv.vercel.app` |
+
+**Notes**
+
+- **matriya-front** is Create React App: `REACT_APP_*` variables are baked in at **build** time. After changing them on Vercel, trigger a **new deployment** (redeploy).
+- **maneger-back** uses `MATRIYA_BACK_URL` to proxy auth to Matriya, call ingest/RAG routes, and related flows. Without it, those features return 503. See [`maneger-back/VERCEL_DEPLOY.md`](./maneger-back/VERCEL_DEPLOY.md).
+- **matriya-back** is the API itself at that URL; you do not set “Matriya URL” there. You *may* set `MANAGEMENT_BACK_URL` / `MATRIYA_MANAGEMENT_API_URL` once **maneger-back** is deployed, so Matriya can talk to Manager (lab bridge, materials). See [`matriya-back/config.js`](./matriya-back/config.js) and [`matriya-front/ENV_SETUP.md`](./matriya-front/ENV_SETUP.md) for `REACT_APP_MANAGEMENT_*` on the Matriya UI.
+- **maneger-front** only needs `VITE_MANEGER_API_URL` pointing at your **deployed maneger-back** URL, not the Matriya API.
+
+Matriya’s API uses permissive CORS (`origin: true`), so browser calls from your deployed frontends work once the correct base URLs are set.
+
+### Vercel: wiring the Manager API URL (`maneger-back`)
+
+When **Manager backend** is live (example: [https://matriya-project-vskr.vercel.app](https://matriya-project-vskr.vercel.app)), set these variables (**no trailing slash** is fine; apps normalize URLs).
+
+| Where | Variable | Example value |
+|--------|----------|-----------------|
+| **maneger-front** (Vercel + local `.env`) | `VITE_MANEGER_API_URL` | `https://matriya-project-vskr.vercel.app` |
+| **matriya-front** (Vercel + local `.env`) | `REACT_APP_MANAGEMENT_API_URL` | `https://matriya-project-vskr.vercel.app` |
+| **matriya-front** (Vercel + local `.env`) | `REACT_APP_MANAGEMENT_FRONT_URL` | `https://matriya-project-3vra.vercel.app` (site **root** — do **not** append `/login`; the app redirects there if needed) |
+| **matriya-back** (Vercel + `matriya-back/.env`) | `MANAGEMENT_BACK_URL` | `https://matriya-project-vskr.vercel.app` — **required for `flow=lab`** (lab bridge). Value must include `https://`; missing scheme causes **“Lab bridge request failed: Invalid URL”** and HTTP **502**. |
+| **matriya-back** (same deploy, if you use “materials library” / management data in Ask Matriya) | `MATRIYA_MANAGEMENT_API_URL` | `https://matriya-project-vskr.vercel.app` |
+
+**CORS on `maneger-back`:** the server only allows listed origins. Defaults include `https://matriya-front.vercel.app` and `https://manegment-front.vercel.app`. If your frontends use **other** `*.vercel.app` hostnames, either set `CORS_ORIGINS` to a comma-separated list of exact origins, or set `CORS_ALLOW_VERCEL_PREVIEWS=true` so any `https://*.vercel.app` preview/production URL is accepted. See [`maneger-back/server.js`](./maneger-back/server.js) (`DEFAULT_CORS_ORIGINS`, `getAllowedOrigins`).
+
+**`maneger-back` itself** does not need its own URL in an env var for normal API operation; optional `PUBLIC_API_BASE_URL` is for absolute links in some responses/docs.
+
 ---
 
 ## Documentation

@@ -6,7 +6,7 @@
  *
  * Successful and error paths return only the Answer Composer JSON contract (no legacy merge fields).
  *
- * Env: MANAGEMENT_BACK_URL — base URL of management-back (e.g. http://localhost:8001)
+ * Env: MANAGEMENT_BACK_URL — base URL of management-back (e.g. https://your-manager.vercel.app or http://localhost:8001)
  */
 
 import axios from 'axios';
@@ -20,9 +20,33 @@ function withLabFlowRouting(body) {
   return { ...body, routing: LAB_FLOW_ROUTING };
 }
 
-export function getManagementBackBaseUrl() {
-  const u = (process.env.MANAGEMENT_BACK_URL || process.env.MATRIYA_MANAGEMENT_BACK_URL || '').trim();
+/**
+ * Axios requires an absolute URL with a scheme. Common mistakes: missing https://, or quotes from the dashboard.
+ */
+function normalizeManagementBackBase(raw) {
+  let u = String(raw ?? '').trim();
+  if (!u) return '';
+  if ((u.startsWith('"') && u.endsWith('"')) || (u.startsWith("'") && u.endsWith("'"))) {
+    u = u.slice(1, -1).trim();
+  }
+  u = u.replace(/\/$/, '');
+  if (!u) return '';
+  if (!/^https?:\/\//i.test(u)) {
+    const isLoopback = /^localhost\b/i.test(u) || /^127\.0\.0\.1\b/.test(u);
+    u = `${isLoopback ? 'http' : 'https'}://${u.replace(/^\/+/, '')}`;
+  }
+  try {
+    const parsed = new URL(u);
+    if (!parsed.hostname) return '';
+  } catch {
+    return '';
+  }
   return u.replace(/\/$/, '');
+}
+
+export function getManagementBackBaseUrl() {
+  const raw = process.env.MANAGEMENT_BACK_URL || process.env.MATRIYA_MANAGEMENT_BACK_URL || '';
+  return normalizeManagementBackBase(raw);
 }
 
 /**
@@ -166,7 +190,11 @@ export async function handleLabBridgeFlow(req, res, { query, userId: _userId }) 
     const body = await composeAnswer(query, contract, null, composerOpts);
     return res.json(withLabFlowRouting(body));
   } catch (e) {
-    const msg = e.response?.data?.error || e.message || 'bridge request failed';
+    let msg = e.response?.data?.error || e.message || 'bridge request failed';
+    if (/invalid url/i.test(String(msg))) {
+      msg =
+        'Invalid URL — set MANAGEMENT_BACK_URL on matriya-back (Vercel) to the full manager API URL, e.g. https://matriya-project-vskr.vercel.app (include https://, no spaces or extra quotes).';
+    }
     const body = await composeAnswer(query, null, null, {
       ...composerOpts,
       skipExternalFetch: true,
