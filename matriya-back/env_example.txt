@@ -1,0 +1,84 @@
+# RAG System Configuration
+# For Vercel: Set these in Vercel Dashboard → Settings → Environment Variables
+
+# Database (Supabase PostgreSQL) - REQUIRED
+# For local dev: if pooler connection fails, use SUPABASE_DB_URL (direct, port 5432).
+# In Supabase: Settings → Database → Connection string → URI (Session or Direct).
+# For Vercel: use POSTGRES_URL (pooler, port 6543).
+POSTGRES_URL=postgres://postgres.[PROJECT_REF]:[PASSWORD]@aws-1-[REGION].pooler.supabase.com:6543/postgres?sslmode=require&pgbouncer=true
+
+# Supabase (optional, for Supabase client features)
+SUPABASE_URL=https://[PROJECT].supabase.co
+SUPABASE_KEY=your-supabase-anon-key
+
+# Embedding Modelc
+EMBEDDING_MODEL=sentence-transformers/all-MiniLM-L6-v2
+
+# LLM Provider - Together AI (recommended)
+LLM_PROVIDER=together
+TOGETHER_API_KEY=your-together-api-key
+TOGETHER_MODEL=mistralai/Mistral-7B-Instruct-v0.2
+
+# OR Hugging Face (backup)
+HF_API_TOKEN=your-hf-token
+HF_MODEL=microsoft/phi-2
+
+# Optional: OpenAI for better embeddings (recommended)
+OPENAI_API_KEY=your-openai-api-key
+
+# Optional: Management API (maneger-back) base URL — no trailing slash. When set, «שאל על המסמכים» can answer
+# from /api/materials + /api/projects after an LLM gate (same Bearer token as Matriya if auth is shared).
+# MATRIYA_MANAGEMENT_API_URL=http://localhost:4000
+# Same value as MANEGER_MATERIALS_SUMMARY_SERVER_KEY on maneger-back — enables aggregate URL without user JWT + Matriya forwards it on server calls.
+# MATRIYA_MANAGEMENT_MATERIALS_KEY=use-a-long-random-string-match-maneger
+
+# JWT Secret (generate a random string)
+JWT_SECRET=your-random-secret-key-here
+
+# Collection Name (must match table created in supabase_setup_complete.sql)
+COLLECTION_NAME=rag_documents
+
+# Max characters per excerpt in "מקורות מהמסמכים" (default 1200, cap 16000)
+# MATRIYA_SOURCE_PREVIEW_CHARS=2000
+
+# Ask Matriya: drop file_search snippets not in pgvector index (stops ghost docs after delete).
+# Set to false only if OpenAI returns filenames that never match (debug).
+# MATRIYA_SNIPPET_INDEX_FILTER=false
+
+# When cloud file_search returns no snippets yet (e.g. right after sync), answer from local pgvector + LLM.
+# MATRIYA_ASK_DISABLE_LOCAL_FALLBACK=1
+# MATRIYA_ASK_LOCAL_FALLBACK_N=16
+
+# File Upload Settings
+MAX_FILE_SIZE=52428800
+# Local: optional (default ./uploads). Vercel: leave UPLOAD_DIR unset or use a path under /tmp only (e.g. /tmp/matriya-uploads).
+# Setting UPLOAD_DIR=uploads on Vercel breaks ingest (read-only filesystem outside /tmp).
+# UPLOAD_DIR=/tmp/matriya-uploads
+
+# Chunking Settings
+CHUNK_SIZE=500
+CHUNK_OVERLAP=100
+
+# Post-retrieval floor: chunks below this similarity are dropped before gates / sources (default 0.7).
+# MATRIYA_RETRIEVAL_SIMILARITY_THRESHOLD=0.7
+# MATRIYA_MAX_ATTRIBUTION_SOURCES=3  # Research flow: top_k sources (חוק קרנל)
+#
+# Domain (query–chunk lexical overlap). Irrelevant snippets/rows are dropped before generation.
+# MATRIYA_DOMAIN_MIN_QUERY_OVERLAP=2   # Min overlap score (0 = off). Empty query tokens → no filter.
+# Latin tokens in the Hebrew question (e.g. XANTHAN, pH) count toward overlap. If no token hits any chunk
+# and there is only one row, it is dropped; if several rows all have zero hit, rows are kept (file_search order).
+#
+# Conclusion gate before local LLM / before trusting Ask Matriya evidence (after similarity + domain).
+# MATRIYA_GENERATION_MIN_CHUNKS=1
+# MATRIYA_GENERATION_MIN_TOPK_SIMILARITY_SUM=0  # e.g. 1.8 requires sum of top-3 similarities ≥ 1.8
+# MATRIYA_GENERATION_TOPK_SUM_K=3
+# Pre-LLM research gate (Ask MATRIYA / מחקר)
+# MATRIYA_PRE_LLM_MIN_SIMILARITY=0.75
+# MATRIYA_PRE_LLM_MIN_CHUNKS=2
+# Optional design-matrix gaps (e.g. APP:PER:MEL triples for INT-TFX). When set, one strong chunk
+# that matches some but not all listed ratios returns HTTP 200 PARTIAL_EVIDENCE (no LLM, suggestion null).
+# MATRIYA_GAP_EXPECTED_RATIOS=3:1:1,2.5:1:1.5,3.5:1:0.5
+# David acceptance: exact three Ask Matriya questions return canned deterministic JSON (demo only).
+# MATRIYA_DAVID_ACCEPTANCE_FIXTURES=1
+# Without fixtures: Q2 needs retrieved text with at least one triple from the matrix below; Q3 needs a
+# snippet containing "Expansion Ratio = 18.5" (or expansion+ratio+18.5). Q1 is always insufficient.

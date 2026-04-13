@@ -1,0 +1,19 @@
+# Files to ignore when deploying to Vercel
+node_modules/
+__pycache__/
+*.py
+*.pyc
+uploads/
+chroma_db/
+*.db
+*.sqlite
+*.sqlite3
+.env
+.env.local
+*.log
+.DS_Store
+.git/
+.gitignore
+README*.md
+*.md
+!README_NODEJS.md
