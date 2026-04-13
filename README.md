@@ -102,6 +102,8 @@ When **Matriya backend** is live (example: [https://matriya-project-fttv.vercel.
 
 Matriya’s API uses permissive CORS (`origin: true`), so browser calls from your deployed frontends work once the correct base URLs are set.
 
+**Uploads on Vercel:** Matriya does not persist raw files on disk between requests (serverless filesystem is ephemeral). Uploads are buffered in RAM, written under **`/tmp`** for processing, chunked, and stored in **Postgres / pgvector** (and optionally OpenAI). Ensure **`POSTGRES_URL`** and **`OPENAI_API_KEY`** (for embeddings on Vercel) are set on the Matriya backend project.
+
 ### Vercel: wiring the Manager API URL (`maneger-back`)
 
 When **Manager backend** is live (example: [https://matriya-project-vskr.vercel.app](https://matriya-project-vskr.vercel.app)), set these variables (**no trailing slash** is fine; apps normalize URLs).

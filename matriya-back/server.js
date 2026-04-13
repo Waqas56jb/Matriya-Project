@@ -7,8 +7,9 @@ import multer from 'multer';
 import { Op } from 'sequelize';
 import { fileURLToPath } from 'url';
 import path, { dirname, join } from 'path';
-import { existsSync, mkdirSync, unlinkSync } from 'fs';
-import settings from './config.js';
+import { randomBytes } from 'crypto';
+import { existsSync, mkdirSync, unlinkSync, writeFileSync } from 'fs';
+import settings, { IS_VERCEL_SERVERLESS } from './config.js';
 import RAGService from './ragService.js';
 import { initDb, SearchHistory, ResearchSession, ResearchAuditLog, PolicyAuditLog, DecisionAuditLog, NoiseEvent, IntegrityCycleSnapshot, Experiment, EXPERIMENT_OUTCOMES } from './database.js';
 import { authRouter, getCurrentUser, requireAuth } from './authEndpoints.js';
@@ -276,12 +277,27 @@ const storage = multer.diskStorage({
   }
 });
 
+/**
+ * Vercel serverless: project dir is read-only; diskStorage can fail. Keep files in RAM then write once to /tmp.
+ * Local: diskStorage sets file.path.
+ */
 const upload = multer({
-  storage: storage,
+  storage: IS_VERCEL_SERVERLESS ? multer.memoryStorage() : storage,
   limits: {
     fileSize: settings.MAX_FILE_SIZE
   }
 });
+
+/** Write multer memory buffer to UPLOAD_DIR (/tmp on Vercel). Returns absolute path. */
+function persistMemoryUploadBuffer(file, fileExt) {
+  const destDir = settings.UPLOAD_DIR;
+  mkdirSync(destDir, { recursive: true });
+  const ext = (fileExt && String(fileExt).length <= 10 ? String(fileExt) : '') || '.bin';
+  const base = `${Date.now()}-${Math.round(Math.random() * 1e9)}-${randomBytes(6).toString('hex')}${ext.startsWith('.') ? ext : `.${ext}`}`;
+  const full = join(destDir, base.replace(/\.\./g, ''));
+  writeFileSync(full, file.buffer);
+  return full;
+}
 
 // Scope 1: parallel processes – one research run per session at a time
 const researchRunLocks = new Map();
@@ -568,8 +584,6 @@ app.post("/ingest/file", upload.single('file'), async (req, res) => {
       error: `File size exceeds maximum of ${settings.MAX_FILE_SIZE} bytes`
     });
   }
-  
-  const tempFilePath = file.path;
 
   try {
     if (originalFilename.includes('%') && /%[0-9A-F]{2}/i.test(originalFilename)) {
@@ -589,12 +603,41 @@ app.post("/ingest/file", upload.single('file'), async (req, res) => {
   }
   const displayFilename = relativePath || originalFilename;
 
+  /** Disk path for documentProcessor (memory uploads on Vercel → spill to /tmp once). */
+  let tempFilePath = null;
+  if (IS_VERCEL_SERVERLESS) {
+    if (!file.buffer || !Buffer.isBuffer(file.buffer)) {
+      return res.status(500).json({
+        error: 'Upload buffer missing on serverless. Check Matriya back deployment and multer limits.',
+        hint: `UPLOAD_DIR=${settings.UPLOAD_DIR} (must be under /tmp on Vercel).`
+      });
+    }
+    try {
+      tempFilePath = persistMemoryUploadBuffer(file, fileExt);
+      logger.info(`[ingest/file] persisted memory upload (${file.size} bytes) → ${tempFilePath}`);
+    } catch (e) {
+      logger.error(`[ingest/file] failed to write temp file: ${e.message}`);
+      return res.status(500).json({
+        error: `Failed to save upload for processing: ${e.message}`,
+        hint: 'On Vercel only /tmp is writable; UPLOAD_DIR should be /tmp/matriya-uploads (set automatically when VERCEL or VERCEL_URL is set).'
+      });
+    }
+  } else {
+    tempFilePath = file.path;
+    if (!tempFilePath || !existsSync(tempFilePath)) {
+      return res.status(500).json({
+        error: 'Uploaded file not found on disk after multer.',
+        hint: 'Check UPLOAD_DIR exists and is writable.'
+      });
+    }
+  }
+
   let ragService;
   try {
     ragService = getRagService();
   } catch (e) {
     logger.error(`RAG service init failed: ${e.message}`);
-    try { if (existsSync(tempFilePath)) unlinkSync(tempFilePath); } catch (_) {}
+    try { if (tempFilePath && existsSync(tempFilePath)) unlinkSync(tempFilePath); } catch (_) {}
     const isEnv = /required|environment|POSTGRES|SUPABASE/i.test(e.message);
     return res.status(isEnv ? 503 : 500).json({
       error: e.message,
@@ -606,7 +649,7 @@ app.post("/ingest/file", upload.single('file'), async (req, res) => {
     const result = await ragService.ingestFile(tempFilePath, displayFilename);
 
     try {
-      if (existsSync(tempFilePath)) unlinkSync(tempFilePath);
+      if (tempFilePath && existsSync(tempFilePath)) unlinkSync(tempFilePath);
     } catch (e) {
       logger.warn(`Failed to delete temp file: ${e.message}`);
     }
@@ -633,7 +676,7 @@ app.post("/ingest/file", upload.single('file'), async (req, res) => {
     logger.error(`Error ingesting file: ${e.message}`);
     logger.error(`Stack trace: ${e.stack}`);
     try {
-      if (existsSync(tempFilePath)) unlinkSync(tempFilePath);
+      if (tempFilePath && existsSync(tempFilePath)) unlinkSync(tempFilePath);
     } catch (e2) {}
     return res.status(500).json({
       error: `Error ingesting file: ${e.message}`,
@@ -828,8 +871,24 @@ app.post("/ask-matriya", requireAuth, askMatriyaMulter, async (req, res) => {
     const tempPaths = [];
     try {
       for (const f of files) {
-        tempPaths.push(f.path);
-        const result = await docProcessor.processFile(f.path);
+        let diskPath = f.path;
+        if (IS_VERCEL_SERVERLESS && f.buffer && Buffer.isBuffer(f.buffer)) {
+          const on = Buffer.isBuffer(f.originalname) ? f.originalname.toString('utf-8') : String(f.originalname || 'file');
+          const ext = path.extname(on).toLowerCase();
+          const okExt = settings.ALLOWED_EXTENSIONS.includes(ext) ? ext : '.bin';
+          try {
+            diskPath = persistMemoryUploadBuffer(f, okExt);
+          } catch (e) {
+            logger.error(`[ask-matriya] temp write failed: ${e.message}`);
+            continue;
+          }
+        }
+        if (!diskPath || !existsSync(diskPath)) {
+          logger.warn('[ask-matriya] skip attachment: no readable temp path');
+          continue;
+        }
+        tempPaths.push(diskPath);
+        const result = await docProcessor.processFile(diskPath);
         if (result.success && result.text && fileContext.length < MAX_FILE_CONTEXT_CHARS) {
           const logicalName = result.metadata?.filename || f.originalname;
           const sheet =

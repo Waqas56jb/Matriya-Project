@@ -13,8 +13,14 @@ const __dirname = dirname(__filename);
 // Always load .env from this package root (fixes empty MANAGEMENT_BACK_URL when cwd is not matriya-back).
 dotenv.config({ path: join(__dirname, '.env') });
 
-const VERCEL_DEPLOY =
-  process.env.VERCEL === '1' || process.env.VERCEL === 'true' || Boolean(process.env.VERCEL_ENV);
+/** True on Vercel / serverless: writable FS only under /tmp; use memory→/tmp for uploads. */
+export const IS_VERCEL_SERVERLESS =
+  process.env.VERCEL === '1' ||
+  process.env.VERCEL === 'true' ||
+  Boolean(process.env.VERCEL_ENV) ||
+  Boolean(process.env.VERCEL_URL);
+
+const VERCEL_DEPLOY = IS_VERCEL_SERVERLESS;
 
 /** Multer temp files: must live under /tmp on Vercel (project dir is read-only). */
 function resolveUploadDir() {

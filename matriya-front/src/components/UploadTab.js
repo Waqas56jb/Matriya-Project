@@ -310,7 +310,10 @@ function UploadTab({ onGptSyncingChange, gptRagSyncing = false }) {
         setIsUploading(true);
         setUploadResult(null);
         try {
-            const response = await api.post('/ingest/file', formData, { headers: INGEST_OPT_OUT_AUTO_GPT_SYNC });
+            const response = await api.post('/ingest/file', formData, {
+                headers: INGEST_OPT_OUT_AUTO_GPT_SYNC,
+                timeout: 300000
+            });
             if (response.data.success) {
                 setUploadResult({ type: 'success', message: 'העלאה הושלמה בהצלחה!', data: response.data.data });
                 const logicalName = response.data?.data?.filename;
@@ -339,7 +342,10 @@ function UploadTab({ onGptSyncingChange, gptRagSyncing = false }) {
             const relativePath = file.webkitRelativePath || (file.path && typeof file.path === 'string' ? file.path : null);
             if (relativePath) formData.append('relative_path', relativePath);
             try {
-                const response = await api.post('/ingest/file', formData, { headers: INGEST_OPT_OUT_AUTO_GPT_SYNC });
+                const response = await api.post('/ingest/file', formData, {
+                headers: INGEST_OPT_OUT_AUTO_GPT_SYNC,
+                timeout: 300000
+            });
                 if (response.data?.success) {
                     ok++;
                     const fn = response.data?.data?.filename;
