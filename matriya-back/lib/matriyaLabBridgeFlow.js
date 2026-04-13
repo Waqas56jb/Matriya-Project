@@ -11,6 +11,7 @@
 
 import axios from 'axios';
 import { composeAnswer } from '../services/answerComposer.js';
+import { normalizeHttpServiceBaseUrl } from './normalizeEnvUrl.js';
 
 /** Always set on flow=lab HTTP responses alongside composeAnswer fields (David: stable contract). */
 export const LAB_FLOW_ROUTING = 'LAB_BRIDGE_ONLY';
@@ -20,33 +21,9 @@ function withLabFlowRouting(body) {
   return { ...body, routing: LAB_FLOW_ROUTING };
 }
 
-/**
- * Axios requires an absolute URL with a scheme. Common mistakes: missing https://, or quotes from the dashboard.
- */
-function normalizeManagementBackBase(raw) {
-  let u = String(raw ?? '').trim();
-  if (!u) return '';
-  if ((u.startsWith('"') && u.endsWith('"')) || (u.startsWith("'") && u.endsWith("'"))) {
-    u = u.slice(1, -1).trim();
-  }
-  u = u.replace(/\/$/, '');
-  if (!u) return '';
-  if (!/^https?:\/\//i.test(u)) {
-    const isLoopback = /^localhost\b/i.test(u) || /^127\.0\.0\.1\b/.test(u);
-    u = `${isLoopback ? 'http' : 'https'}://${u.replace(/^\/+/, '')}`;
-  }
-  try {
-    const parsed = new URL(u);
-    if (!parsed.hostname) return '';
-  } catch {
-    return '';
-  }
-  return u.replace(/\/$/, '');
-}
-
 export function getManagementBackBaseUrl() {
   const raw = process.env.MANAGEMENT_BACK_URL || process.env.MATRIYA_MANAGEMENT_BACK_URL || '';
-  return normalizeManagementBackBase(raw);
+  return normalizeHttpServiceBaseUrl(raw);
 }
 
 /**
@@ -194,6 +171,10 @@ export async function handleLabBridgeFlow(req, res, { query, userId: _userId }) 
     if (/invalid url/i.test(String(msg))) {
       msg =
         'Invalid URL — set MANAGEMENT_BACK_URL on matriya-back (Vercel) to the full manager API URL, e.g. https://matriya-project-vskr.vercel.app (include https://, no spaces or extra quotes).';
+    }
+    if (/ENOTFOUND|getaddrinfo/i.test(String(msg)) && /=/i.test(String(process.env.MANAGEMENT_BACK_URL || process.env.MATRIYA_MANAGEMENT_BACK_URL || ''))) {
+      msg =
+        `${msg} — Check Vercel: the variable VALUE must be only the URL (e.g. https://matriya-project-vskr.vercel.app), not a line like MANAGEMENT_BACK_URL=https://...`;
     }
     const body = await composeAnswer(query, null, null, {
       ...composerOpts,

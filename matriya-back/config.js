@@ -5,6 +5,7 @@ import dotenv from 'dotenv';
 import { fileURLToPath } from 'url';
 import { dirname, join } from 'path';
 import { existsSync, mkdirSync } from 'fs';
+import { normalizeHttpServiceBaseUrl } from './lib/normalizeEnvUrl.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
@@ -72,8 +73,8 @@ class Settings {
       return Math.min(2, t);
     })();
 
-    /** Optional: Management (maneger) API base URL, no trailing slash — e.g. http://localhost:4000 — for «שאל על המסמכים» materials-library branch */
-    this.MATRIYA_MANAGEMENT_API_URL = (process.env.MATRIYA_MANAGEMENT_API_URL || '').trim().replace(/\/$/, '') || '';
+    /** Optional: Management (maneger) API base URL, no trailing slash — e.g. https://your-manager.vercel.app — for «שאל על המסמכים» materials-library branch */
+    this.MATRIYA_MANAGEMENT_API_URL = normalizeHttpServiceBaseUrl(process.env.MATRIYA_MANAGEMENT_API_URL || '');
     /** Same secret as MANEGER_MATERIALS_SUMMARY_SERVER_KEY on maneger-back — sent as X-Matriya-Materials-Key (works without user JWT on that route). */
     this.MATRIYA_MANAGEMENT_MATERIALS_KEY = (process.env.MATRIYA_MANAGEMENT_MATERIALS_KEY || '').trim();
 
